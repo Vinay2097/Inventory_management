@@ -43,11 +43,25 @@ class ProductMovement(db.Model):
     Flag = db.Column(db.String(50),nullable=False)
 
 @app.route('/')
-@app.route('/home')
+@app.route('/home',methods=['GET','POST'])
 def home():
-	inventory_details = get_data()
+	products=[]
+	locations=[]
+	if 'products' in request.form:
+		products= request.form.getlist('products')
+		flash(f"{products}!", "danger")
+	if 'locations' in request.form:
+		locations= request.form.getlist('locations')
+		flash(f"{locations}!", "danger")
 
-	return render_template('index.html',title='Inventory Management',details=inventory_details)
+
+
+	inventory_details = get_data(products,locations)
+
+
+	products = Product.query.all()
+	locations = Location.query.all()
+	return render_template('index.html',title='Inventory Management',products=products,locations=locations,details=inventory_details)
 
 	
 
@@ -185,8 +199,6 @@ def locations():
 def movement():
 	if request.method=='POST':
 		if 'add_product_qty' in request.form:
-			i_sum_qty = []
-			e_sum_qty = []
 			check = None 
 			product_name = request.form['product_name']
 			from_location = request.form['from_location']
@@ -227,10 +239,10 @@ def movement():
 					add_movement.to_location=to_location
 
 				
-				if check=="to_location":
-					add_movement.from_location=from_location
-				if check=="from_location":
-					add_movement.to_location=to_location
+				# if check=="to_location":
+				# 	add_movement.from_location=from_location
+				# if check=="from_location":
+				# 	add_movement.to_location=to_location
 				sum_qty = get_total(product_name,from_location)
 				#e_sum_qty = get_total(product_name,from_location)
 
@@ -302,6 +314,9 @@ def movement():
 				flash(f"Product is Not Available/Deleted", "danger")
 				return redirect('/movement')
 
+			#pimport_qty = ProductMovement.query.filter(ProductMovement.id < movement_id , ProductMovement.product_name == product_name ,ProductMovement.to_location == from_location)
+			#pexport_qty = ProductMovement.query.filter(ProductMovement.id < movement_id , ProductMovement.product_name == product_name ,ProductMovement.from_location == from_location)
+			
 			if from_location == "---":
 				past_sum_qty = get_total(product_name,to_location,movement_id,"past")
 			else :
@@ -311,13 +326,51 @@ def movement():
 				future_sum_qty = get_total(product_name,from_location,movement_id,"future")
 			else :
 				future_sum_qty = get_total(product_name,to_location,movement_id,"future")
+			#fexport_qty = ProductMovement.query.filter(ProductMovement.id > movement_id , ProductMovement.product_name == product_name ,ProductMovement.from_location == to_location)
+			#fimport_qty = ProductMovement.query.filter(ProductMovement.id > movement_id , ProductMovement.product_name == product_name ,ProductMovement.to_location == to_location)
+			#fcheck_qty = ProductMovement.query.filter(ProductMovement.id > movement_id , ProductMovement.product_name == product_name ,ProductMovement.from_location == to_location).first()
 			edit_movement = ProductMovement.query.get_or_404(movement_id)
 			
+			# for e_qty in pexport_qty :
+			# 	j = e_qty.product_qty
+			# 	pexp_sum_qty.insert(0,j)
+			# pexp_sum_qty = sum(pexp_sum_qty)
+
+			# for i_qty in pimport_qty :
+			# 	i = i_qty.product_qty
+			# 	pimp_sum_qty.insert(0,i)
+			# pimp_sum_qty = sum(pimp_sum_qty)
+
+			# if pexp_sum_qty > pimp_sum_qty :
+			# 	past_sum_qty = pexp_sum_qty - pimp_sum_qty
+			# else :
+			# 	past_sum_qty = pimp_sum_qty - pexp_sum_qty
+
+			# for fe_qty in fexport_qty :
+			# 	a = fe_qty.product_qty
+			# 	fexp_sum_qty.insert(0,a)
+			# fexp_sum_qty = sum(fexp_sum_qty)
+
+			# for fi_qty in fimport_qty :
+			# 	b = fi_qty.product_qty
+			# 	fimp_sum_qty.insert(0,b)
+			# fimp_sum_qty = sum(fimp_sum_qty)
+
+			# if fexp_sum_qty > fimp_sum_qty :
+			# 	future_sum_qty = fexp_sum_qty - fimp_sum_qty
+			# else :
+			# 	future_sum_qty = fimp_sum_qty - fexp_sum_qty
+
+
+
 			if from_location == to_location : #from location & to location cant be same.
 				valid = False
 				flash(f"From Location & To Location cannot be same!", "danger")
 				return redirect('/movement')
-			
+			# if bool(ProductMovement.query.filter_by(product_name=product_name,from_location=from_location,to_location=to_location,product_qty=product_qty).first()):
+			# 	valid = False
+			# 	flash(f" movement already exists in the data!", "danger")
+			# 	return redirect('/movement')
 			if int(product_qty) == 0 or int(product_qty) < 0: # qty cant 0
 				valid = False
 				flash(f"Please add quantity !", "danger")
@@ -334,7 +387,7 @@ def movement():
 						valid = True
 					else :
 						valid=False
-						flash(f"Please add atleast {future_sum_qty} quantity of {product_name} at '{to_location}' Warehouse !", "danger")
+						flash(f"1 Please add atleast {future_sum_qty} quantity of {product_name} at '{to_location}' Warehouse !", "danger")
 						return redirect('/movement')
 				
 				# if check_location > 0:
@@ -379,8 +432,8 @@ def movement():
 			elif past_sum_qty < future_sum_qty:
 				if int(product_qty) < past_sum_qty and int(product_qty) < future_sum_qty:
 					valid=True
-				if int(product_qty) > past_sum_qty or int(product_qty) > future_sum_qty:
-					flash(f" lease enter quantity less than {past_sum_qty}  for  '{from_location}' to {to_location} movement !", "danger")
+				if (int(product_qty) > past_sum_qty or int(product_qty) > future_sum_qty) and from_location != '---':
+					flash(f" Please enter quantity less than {past_sum_qty}  for  '{from_location}' to {to_location} movement !", "danger")
 					return redirect('/movement')
 
 			elif int(product_qty) <= past_sum_qty and int(product_qty) >= future_sum_qty :
@@ -395,11 +448,14 @@ def movement():
 					return redirect('/movement')
 				elif int(product_qty) < past_sum_qty and int(product_qty) < future_sum_qty:
 					valid=False
-					flash(f" Please add atleast {future_sum_qty} quantity of {product_name} for '{from_location}' to {to_location} movement !", "danger")
+					flash(f"Please add atleast {future_sum_qty} quantity of {product_name} for '{from_location}' to {to_location} movement !", "danger")
 					return redirect('/movement')
 				else:
 					valid=False
-					flash(f" Please enter quantity between {past_sum_qty} to {future_sum_qty}  for  '{from_location}' to {to_location} movement !", "danger")
+					if past_sum_qty > future_sum_qty:
+						flash(f" Please enter quantity {past_sum_qty} or less than {past_sum_qty} for  '{from_location}' to {to_location} movement !", "danger")
+					else:
+						flash(f" Please enter quantity between {past_sum_qty} to {future_sum_qty}  for  '{from_location}' to {to_location} movement !", "danger")
 					return redirect('/movement')
 					
 
@@ -419,12 +475,25 @@ def movement():
 
 
 	else:
-		all_product = Product.query.order_by(Product.id).all()
-		all_location = Location.query.order_by(Location.id).all()
+		all_product = Product.query.all()
+		all_location = Location.query.all()
 		all_movement = ProductMovement.query.filter_by(Flag="A").order_by(ProductMovement.id).all()
 		return render_template('movement.html',title='ProductMovement',products=all_product,locations=all_location,movements=all_movement)
+		
 	
-	
+# @app.route('/delete/<string:name>')
+# def delete(name):
+# 	var='Mumbaiii4'
+# 	if name == var[:6]:
+# 		delete_item = Location.query.filter_by(name=name).first()
+# 		db.session.delete(delete_item)
+# 		db.session.commit()
+# 		flash('You were successfully added')
+# 		return redirect('/location')
+# 	else:
+# 		return redirect('/location')
+
+
 
 def get_total(product, location,movement=None,process=None):
 	imported = 0
@@ -487,10 +556,18 @@ def get_exported(product, location,movement=None,process=None):
 
 
 
-def get_data():
+def get_data(product = [],location = []):
 	all_data=[]
-	products = Product.query.all()
-	locations = Location.query.all()
+
+	if product != []:
+		products = Product.query.filter(Product.name.in_(product)).all()
+	if product == [] or product == ['All']:
+		products = Product.query.all()
+	if location != []:
+		locations = Location.query.filter(Location.name.in_(location)).all()
+	if location == [] or location == ['All']:
+		locations = Location.query.all()
+	
 	for product in products:
 		for location in locations:
 			data = {}
